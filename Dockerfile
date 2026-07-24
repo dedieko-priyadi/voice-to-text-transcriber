@@ -2,9 +2,9 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install FFmpeg
+# Install FFmpeg and audio libraries for librosa
 RUN apt-get update && \
-    apt-get install -y ffmpeg && \
+    apt-get install -y ffmpeg libsndfile1 && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy requirements
@@ -18,7 +18,6 @@ COPY streamlit_app.py .
 COPY cli_transcribe.py .
 COPY transcriber.py .
 COPY audio_processor.py .
-COPY .env .
 
 # Create directories
 RUN mkdir -p input output

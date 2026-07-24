@@ -100,60 +100,6 @@ class AudioProcessor:
         ext = Path(file_path).suffix.lstrip(".").lower()
         return ext in self.AUDIO_FORMATS
     
-    def extract_audio_from_video(self, video_path: str, output_path: Optional[str] = None) -> str:
-        """
-        Extract audio dari video file menggunakan ffmpeg
-        
-        Args:
-            video_path: Path ke video file
-            output_path: Path untuk save audio (default: .temp_audio/extracted_audio.mp3)
-        
-        Returns:
-            Path ke file audio yang sudah diekstrak
-        """
-        if output_path is None:
-            output_path = self.temp_dir / "extracted_audio.mp3"
-        else:
-            output_path = Path(output_path)
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-        
-        print(f"Extracting audio from video: {Path(video_path).name}")
-        
-        try:
-            ffmpeg_bin = self.ffmpeg_path or "ffmpeg"
-            # Gunakan ffmpeg untuk ekstraksi
-            # Format: ffmpeg -i input.mp4 -q:a 0 -map a output.mp3
-            cmd = [
-                ffmpeg_bin,
-                "-i", str(video_path),
-                "-q:a", "0",
-                "-map", "a",
-                str(output_path),
-                "-y"  # Overwrite output file
-            ]
-            
-            result = subprocess.run(cmd, capture_output=True, text=True)
-            
-            if result.returncode != 0:
-                raise Exception(f"FFmpeg error: {result.stderr}")
-            
-            if not output_path.exists():
-                raise Exception(f"Audio extraction failed: output file not created")
-            
-            file_size = output_path.stat().st_size / 1024 / 1024
-            print(f"✓ Audio extracted: {output_path.name} ({file_size:.2f} MB)")
-            return str(output_path)
-        
-        except FileNotFoundError:
-            raise Exception(
-                "FFmpeg not found. Install FFmpeg:\n"
-                "- Windows: choco install ffmpeg\n"
-                "- macOS: brew install ffmpeg\n"
-                "- Linux: sudo apt-get install ffmpeg"
-            )
-        except Exception as e:
-            raise Exception(f"Error extracting audio: {str(e)}")
-    
     def process_media_file(self, file_path: str) -> str:
         """
         Process media file (video atau audio)
