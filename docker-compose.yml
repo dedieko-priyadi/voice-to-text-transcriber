@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  transcriber:
+    build: .
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./input:/app/input
+      - ./output:/app/output
+    env_file:
+      - .env
+    environment:
+      - PYTHONUNBUFFERED=1
+    container_name: voice-to-text-transcriber
+    # Untuk development - auto-reload
+    # command: streamlit run streamlit_app.py --logger.level=debug
+
+  # Optional: CLI service untuk batch processing
+  transcriber-cli:
+    build: .
+    volumes:
+      - ./input:/app/input
+      - ./output:/app/output
+    env_file:
+      - .env
+    environment:
+      - PYTHONUNBUFFERED=1
+    # Override default command untuk CLI
+    command: python cli_transcribe.py input/audio.mp3 --formats text,json
+    # Uncomment untuk auto-run saat docker-compose up
+    # profiles: ["cli"]
