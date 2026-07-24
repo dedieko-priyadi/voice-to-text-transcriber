@@ -142,13 +142,18 @@ class AudioTranscriber:
             
             transcript = self.client.audio.transcriptions.create(**kwargs)
         
-        # Return hasil sesuai format
+        # Ekstrak teks dari response object
         if isinstance(transcript, str):
-            return transcript
+            text = transcript
         elif hasattr(transcript, "text"):
-            return transcript.text
+            text = transcript.text
         else:
-            return str(transcript)
+            text = str(transcript)
+        
+        # Bungkus sebagai JSON jika format json/verbose_json
+        if response_format in ("json", "verbose_json"):
+            return json.dumps({"text": text}, ensure_ascii=False)
+        return text
     
     def transcribe_and_save(
         self,

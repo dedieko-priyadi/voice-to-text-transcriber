@@ -41,8 +41,9 @@ env/
 .temp_audio/
 *.temp
 
-# Output (optional - keep for tracking)
-# output/
+# Output & Upload directories
+input/
+output/
 
 # MacOS
 .DS_Store

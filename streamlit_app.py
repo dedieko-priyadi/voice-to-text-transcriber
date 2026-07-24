@@ -128,6 +128,12 @@ with col2:
     st.subheader("📊 Status")
     placeholder_status = st.empty()
 
+# Session state init — persist hasil transcribe antar rerun
+if "last_stem" not in st.session_state:
+    st.session_state.last_stem = None
+if "last_formats" not in st.session_state:
+    st.session_state.last_formats = []
+
 # Transcription section
 st.divider()
 st.subheader("🚀 Transkrip")
@@ -137,54 +143,45 @@ if st.button("Mulai Transcription", type="primary", use_container_width=True):
         st.error("❌ Silakan upload file audio terlebih dahulu")
     else:
         try:
-            # Initialize
             api_key = os.getenv("OPENAI_API_KEY")
             if not api_key:
                 st.error("❌ OPENAI_API_KEY tidak ditemukan. Buat file .env dengan API key Anda.")
             else:
-                # Save uploaded file
                 input_dir = Path("input")
                 input_dir.mkdir(exist_ok=True)
-                
+
                 temp_file_path = input_dir / uploaded_file.name
                 with open(temp_file_path, "wb") as f:
                     f.write(uploaded_file.getbuffer())
-                
+
                 st.info(f"📁 File disimpan: {temp_file_path}")
-                
-                # Initialize transcriber
+
                 transcriber = AudioTranscriber(api_key=api_key)
                 processor = AudioProcessor()
-                
+
                 progress_bar = st.progress(0)
                 status_text = st.empty()
-                output_placeholder = st.empty()
-                
+
                 output_dir = Path("output")
                 output_dir.mkdir(exist_ok=True)
-                
-                # Check if chunking needed
+
                 if processor.needs_chunking(str(temp_file_path)):
-                    status_text.info(f"⚠️ File >25MB, chunking otomatis...")
+                    status_text.info("⚠️ File >25MB, chunking otomatis...")
                     progress_bar.progress(10)
-                    
+
                     chunks = processor.chunk_audio(
                         str(temp_file_path),
-                        chunk_duration_ms=5 * 60 * 1000,  # 5 menit
+                        chunk_duration_ms=5 * 60 * 1000,
                     )
                     progress_bar.progress(30)
-                    
-                    # Transcribe each chunk
-                    all_results = {}
-                    for fmt in selected_formats:
-                        all_results[fmt] = []
-                    
+
+                    all_results = {fmt: [] for fmt in selected_formats}
+
                     for i, chunk_path in enumerate(chunks):
                         progress = 30 + (i / len(chunks)) * 60
-                        progress_bar.progress(progress)
-                        
+                        progress_bar.progress(int(progress))
                         status_text.info(f"📝 Transcribing chunk {i+1}/{len(chunks)}...")
-                        
+
                         chunk_transcripts = transcriber.transcribe_and_save(
                             chunk_path,
                             output_dir=str(output_dir),
@@ -192,18 +189,15 @@ if st.button("Mulai Transcription", type="primary", use_container_width=True):
                             response_formats=selected_formats,
                             language=language,
                         )
-                        
                         for fmt, transcript in chunk_transcripts.items():
                             if transcript:
                                 with open(transcript, "r", encoding="utf-8") as f:
                                     all_results[fmt].append(f.read())
-                    
+
                     progress_bar.progress(95)
-                    
-                    # Merge results
                     status_text.info("🔗 Menggabungkan hasil chunks...")
                     audio_stem = temp_file_path.stem
-                    
+
                     for fmt in selected_formats:
                         if fmt == "text":
                             merged = processor.merge_text_transcripts(all_results[fmt])
@@ -220,17 +214,15 @@ if st.button("Mulai Transcription", type="primary", use_container_width=True):
                             output_file = output_dir / f"{audio_stem}.vtt"
                         else:
                             continue
-                        
                         with open(output_file, "w", encoding="utf-8") as f:
                             f.write(merged)
-                    
+
                     processor.cleanup_chunks()
-                
+
                 else:
-                    # File < 25MB, langsung transcribe
                     status_text.info(f"📝 Transcribing {uploaded_file.name}...")
                     progress_bar.progress(50)
-                    
+
                     results = transcriber.transcribe_and_save(
                         str(temp_file_path),
                         output_dir=str(output_dir),
@@ -238,76 +230,86 @@ if st.button("Mulai Transcription", type="primary", use_container_width=True):
                         response_formats=selected_formats,
                         language=language,
                     )
-                    
                     progress_bar.progress(90)
-                
+
                 progress_bar.progress(100)
                 status_text.empty()
-                
-                # Show results
                 st.success("✅ Transcription selesai!")
-                
-                results_data = []
-                for fmt in selected_formats:
-                    output_file = output_dir / f"{temp_file_path.stem}.{fmt if fmt != 'verbose_json' else 'json'}"
-                    if output_file.exists():
-                        file_size = output_file.stat().st_size
-                        results_data.append({
-                            "Format": fmt.upper(),
-                            "File": output_file.name,
-                            "Size": f"{file_size / 1024:.2f} KB",
-                        })
-                
-                st.dataframe(results_data, use_container_width=True, hide_index=True)
-                
-                # Download buttons
-                st.subheader("📥 Download Hasil")
-                download_cols = st.columns(len(selected_formats))
-                
-                for idx, fmt in enumerate(selected_formats):
-                    output_file = output_dir / f"{temp_file_path.stem}.{fmt if fmt != 'verbose_json' else 'json'}"
-                    
-                    if output_file.exists():
-                        with open(output_file, "r", encoding="utf-8") as f:
-                            file_content = f.read()
-                        
-                        with download_cols[idx]:
-                            st.download_button(
-                                label=f"📄 {fmt.upper()}",
-                                data=file_content,
-                                file_name=output_file.name,
-                                mime="text/plain" if fmt == "text" else "application/json",
-                                use_container_width=True,
-                            )
-                
-                # Preview
-                st.divider()
-                st.subheader("👁️ Preview Transcript")
-                
-                preview_format = st.radio(
-                    "Format preview:",
-                    options=selected_formats,
-                    horizontal=True,
-                )
-                
-                preview_file = output_dir / f"{temp_file_path.stem}.{preview_format if preview_format != 'verbose_json' else 'json'}"
-                if preview_file.exists():
-                    with open(preview_file, "r", encoding="utf-8") as f:
-                        preview_content = f.read()
-                    
-                    if preview_format == "json" or preview_format == "verbose_json":
-                        st.json(json.loads(preview_content))
-                    else:
-                        st.text_area(
-                            f"Transcript ({preview_format.upper()})",
-                            value=preview_content,
-                            height=300,
-                            disabled=True,
-                        )
-        
+
+                # Pin hasil ke session_state agar persist antar rerun
+                st.session_state.last_stem = str(temp_file_path.stem)
+                st.session_state.last_formats = list(selected_formats)
+
         except Exception as e:
             st.error(f"❌ Error: {str(e)}")
             st.exception(e)
+
+# ── Render hasil dari session_state (persist antar widget interaction) ──
+output_dir = Path("output")
+if st.session_state.last_stem and st.session_state.last_formats:
+    stem = st.session_state.last_stem
+    formats = st.session_state.last_formats
+
+    # Results table
+    results_data = []
+    for fmt in formats:
+        output_file = output_dir / f"{stem}.{fmt if fmt != 'verbose_json' else 'json'}"
+        if output_file.exists():
+            file_size = output_file.stat().st_size
+            results_data.append({
+                "Format": fmt.upper(),
+                "File": output_file.name,
+                "Size": f"{file_size / 1024:.2f} KB",
+            })
+
+    st.dataframe(results_data, use_container_width=True, hide_index=True)
+
+    # Download buttons
+    st.subheader("📥 Download Hasil")
+    download_cols = st.columns(len(formats))
+
+    for idx, fmt in enumerate(formats):
+        output_file = output_dir / f"{stem}.{fmt if fmt != 'verbose_json' else 'json'}"
+        if output_file.exists():
+            with open(output_file, "r", encoding="utf-8") as f:
+                file_content = f.read()
+            with download_cols[idx]:
+                st.download_button(
+                    label=f"📄 {fmt.upper()}",
+                    data=file_content,
+                    file_name=output_file.name,
+                    mime="text/plain" if fmt == "text" else "application/json",
+                    use_container_width=True,
+                )
+
+    # Preview
+    st.divider()
+    st.subheader("👁️ Preview Transcript")
+
+    preview_format = st.radio(
+        "Format preview:",
+        options=formats,
+        horizontal=True,
+        key="preview_format",
+    )
+
+    preview_file = output_dir / f"{stem}.{preview_format if preview_format != 'verbose_json' else 'json'}"
+    if preview_file.exists():
+        with open(preview_file, "r", encoding="utf-8") as f:
+            preview_content = f.read()
+        if preview_format in ("json", "verbose_json"):
+            try:
+                st.json(json.loads(preview_content))
+            except json.JSONDecodeError:
+                st.warning("⚠️ File JSON tidak valid (mungkin hasil transcribe lama). Silakan transcribe ulang.")
+                st.text(preview_content[:500])
+        else:
+            st.text_area(
+                f"Transcript ({preview_format.upper()})",
+                value=preview_content if preview_content else "(empty)",
+                height=300,
+                disabled=True,
+            )
 
 # History section
 st.divider()
