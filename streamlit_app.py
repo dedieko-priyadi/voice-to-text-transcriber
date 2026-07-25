@@ -12,6 +12,7 @@ from datetime import datetime
 
 from transcriber import AudioTranscriber
 from audio_processor import AudioProcessor
+from notulen import generate_notulen, format_notulen_markdown
 
 
 # Load environment variables
@@ -311,7 +312,99 @@ if st.session_state.last_stem and st.session_state.last_formats:
                 disabled=True,
             )
 
-# History section
+# ── History section ──
+
+# Notulen section — generate meeting minutes dari transcript
+st.divider()
+st.subheader("📋 Generate Notulen (Meeting Minutes)")
+
+if st.session_state.last_stem and st.session_state.last_formats:
+    stem = st.session_state.last_stem
+    
+    # Get transcript content
+    txt_file = output_dir / f"{stem}.txt"
+    if txt_file.exists():
+        with open(txt_file, "r", encoding="utf-8") as f:
+            transcript_content = f.read()
+        
+        col_gen, col_opt = st.columns([2, 1])
+        
+        with col_gen:
+            if st.button("🤖 Generate Notulen", use_container_width=True):
+                with st.spinner("Generating meeting minutes..."):
+                    # Optional inputs
+                    meeting_title = st.session_state.get("meeting_title", "Meeting")
+                    participants = st.session_state.get("participants", [])
+                    
+                    minutes = generate_notulen(
+                        transcript=transcript_content,
+                        title=meeting_title,
+                        participants=participants,
+                    )
+                    
+                    if minutes:
+                        st.session_state.generated_minutes = minutes
+                        st.success("✅ Notulen berhasil dibuat!")
+                    else:
+                        st.error("❌ Gagal generate notulen. Cek API key & transcript.")
+        
+        with col_opt:
+            st.subheader("⚙️ Opsi")
+            st.session_state.meeting_title = st.text_input(
+                "Meeting title:",
+                value=st.session_state.get("meeting_title", "Untitled Meeting"),
+                key="mt_input",
+            )
+            participants_input = st.text_area(
+                "Participants (comma-separated):",
+                value=",".join(st.session_state.get("participants", [])),
+                key="part_input",
+                height=80,
+            )
+            st.session_state.participants = [p.strip() for p in participants_input.split(",") if p.strip()]
+        
+        # Display generated notulen
+        if "generated_minutes" in st.session_state:
+            minutes = st.session_state.generated_minutes
+            st.divider()
+            
+            # Tabs untuk berbagai format
+            tab_json, tab_md, tab_download = st.tabs(["📊 JSON", "📝 Markdown", "💾 Download"])
+            
+            with tab_json:
+                st.json(minutes.to_dict())
+            
+            with tab_md:
+                md_content = format_notulen_markdown(minutes)
+                st.markdown(md_content)
+            
+            with tab_download:
+                import json as json_lib
+                
+                # JSON export
+                json_data = json_lib.dumps(minutes.to_dict(), indent=2, ensure_ascii=False)
+                st.download_button(
+                    "📥 Download Notulen (JSON)",
+                    data=json_data,
+                    file_name=f"{stem}_notulen.json",
+                    mime="application/json",
+                    use_container_width=True,
+                )
+                
+                # Markdown export
+                md_data = format_notulen_markdown(minutes)
+                st.download_button(
+                    "📥 Download Notulen (Markdown)",
+                    data=md_data,
+                    file_name=f"{stem}_notulen.md",
+                    mime="text/markdown",
+                    use_container_width=True,
+                )
+    else:
+        st.info("💡 Transcript belum tersedia. Transcribe audio file terlebih dahulu.")
+
+st.divider()
+st.subheader("📜 History")
 st.divider()
 st.subheader("📜 Transcript History")
 
