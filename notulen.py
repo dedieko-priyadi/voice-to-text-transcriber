@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 from dotenv import load_dotenv
 load_dotenv()
 
-LLM_BASE_URL = os.getenv("LLM_BASE_URL", "https://pc-amd7900x.tail758353.ts.net/ugmrouter/v1")
+LLM_BASE_URL = os.getenv("LLM_BASE_URL", "https://<your-tailnet-host>/ugmrouter/v1")
 LLM_API_KEY = os.getenv("LLM_API_KEY", os.getenv("OPENAI_API_KEY", ""))
 LLM_MODEL = os.getenv("LLM_MODEL", "gpt-4o-mini")
 
