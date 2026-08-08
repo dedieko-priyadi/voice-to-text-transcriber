@@ -53,3 +53,5 @@ output/
 # Windows
 Thumbs.db
 ha_config/
+
+*.bak-*

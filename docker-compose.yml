@@ -14,7 +14,7 @@ services:
     container_name: voice-to-text-transcriber
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8501/voice-to-text/_stcore/health', timeout=5)"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -48,3 +48,9 @@ services:
     restart: "no"
     profiles:
       - cli
+
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.18.0.0/24   # /24 (dulu /16) — hemat pool, migrasi 2026-08-06
